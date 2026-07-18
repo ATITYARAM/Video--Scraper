@@ -1,15 +1,16 @@
-# Node
+# Dependencies
 node_modules/
-
-# Playwright browser cache (optional)
-playwright-report/
-test-results/
 
 # Authentication
 auth.json
 
 # Generated output
 references.md
+videos.json
+*.yaml
+
+# Debug
+page.html
 
 # Logs
 *.log
@@ -17,4 +18,5 @@ npm-debug.log*
 
 # OS
 .DS_Store
-Thumbs.db
+Thumbs.dby
+

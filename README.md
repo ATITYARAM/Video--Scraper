@@ -24,7 +24,7 @@ Clone the repository.
 
 ```bash
 git clone https://github.com/ATITYARAM/Video--Scraper.git
-cd manarkeni-video-scraper
+cd Video--Scraper
 ```
 
 Install dependencies.
