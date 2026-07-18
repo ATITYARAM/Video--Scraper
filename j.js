@@ -9,6 +9,13 @@ const rl = readline.createInterface({
     output: process.stdout
 });
 
+let printHeader = true;
+
+rl.on("line", () => {
+    printHeader = true;
+    console.log("\nStarted a new references block.\n");
+});
+
 (async () => {
 
     const browser = await chromium.launch({
@@ -25,45 +32,22 @@ const rl = readline.createInterface({
         "https://manarkeni.tnschools.gov.in/Manrkeni-home/chapter;class=12;medium=19;termId=4;subjectId=3;subjectName=Mathematics"
     );
 
-    fs.writeFileSync(
-        OUTPUT,
-        ""
-    );
-
     console.log(`
-=========================================
+===========================================
 Open any chapter.
 Open any section.
-
-Press ENTER whenever you start
-a NEW SECTION.
-
-Then open videos manually.
-
-Everything is appended to:
-${OUTPUT}
-
-Ctrl+C to stop.
-=========================================
+Press ENTER when a NEW section starts.
+Open videos manually.
+Everything is saved to ${OUTPUT}
+Press Ctrl+C to stop.
+===========================================
 `);
 
-    let writeHeader = false;
     let lastVideo = "";
 
-    rl.on("line", () => {
-
-        writeHeader = true;
-
-        console.log(">>> New references block");
-
-    });
-
-    let clicked = {
-        subtopic: ""
-    };
-
-    await page.exposeFunction("rememberCard", data => {
-        clicked = data;
+    // Store clicked card information
+    await page.exposeFunction("storeClicked", data => {
+        global.clicked = data;
     });
 
     await page.addInitScript(() => {
@@ -81,8 +65,15 @@ Ctrl+C to stop.
                     .replace("Subtopic :", "")
                     .trim();
 
-            window.rememberCard({
-                subtopic
+            const concept =
+                card.querySelector("p b")
+                    ?.innerText
+                    .replace("Concept :", "")
+                    .trim();
+
+            window.storeClicked({
+                subtopic,
+                concept
             });
 
         }, true);
@@ -93,51 +84,58 @@ Ctrl+C to stop.
 
         try {
 
-            if (await page.locator("video source").count()) {
-
-                const url =
-                    await page.locator("video source").getAttribute("src");
-
-                if (url && url !== lastVideo) {
-
-                    lastVideo = url;
-
-                    const title =
-                        (await page.locator("app-video-list h4").textContent()).trim();
-
-                    if (writeHeader) {
-
-                        fs.appendFileSync(
-                            OUTPUT,
-`references:
-    videos:
-
-`
-                        );
-
-                        writeHeader = false;
-                    }
-
-                    fs.appendFileSync(
-                        OUTPUT,
-`      - custom:
-          title: "${title}"
-          desc: "${clicked.subtopic}"
-          url: "${url}"
-
-`
-                    );
-
-                    console.log("Saved:", title);
-
-                }
-
+            if (!(await page.locator("video source").count())) {
+                await page.waitForTimeout(300);
+                continue;
             }
 
-        } catch (e) {}
+            const url =
+                await page.locator("video source").getAttribute("src");
+
+            if (!url || url === lastVideo) {
+                await page.waitForTimeout(300);
+                continue;
+            }
+
+            lastVideo = url;
+
+            const title =
+                (await page.locator("app-video-list h4").textContent()).trim();
+
+            const desc =
+                global.clicked?.subtopic || title;
+
+            if (printHeader) {
+
+                printHeader = false;
+
+                fs.appendFileSync(
+                    OUTPUT,
+`\nreferences:
+    videos:
+`
+                );
+            }
+
+            fs.appendFileSync(
+                OUTPUT,
+`      - custom:
+          title: "${title}"
+          desc: "${desc}"
+          url: "${url}"
+`
+            );
+
+            console.log("Saved:", title);
+
+        } catch {
+
+        }
 
         await page.waitForTimeout(300);
 
     }
 
 })();
+
+
