@@ -1,0 +1,13 @@
+{
+  "name": "manarkeni-video-scraper",
+  "version": "1.0.0",
+  "description": "Playwright utility to collect Manarkeni video URLs.",
+  "main": "scrape.js",
+  "scripts": {
+    "start": "node scrape.js",
+    "login": "node login.js"
+  },
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
+}
