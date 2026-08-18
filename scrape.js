@@ -10,6 +10,7 @@ const rl = readline.createInterface({
 });
 
 let printHeader = true;
+let clickedVideo = null;
 
 rl.on("line", () => {
     printHeader = true;
@@ -28,52 +29,87 @@ rl.on("line", () => {
 
     const page = await context.newPage();
 
-    await page.goto(
-        "https://manarkeni.tnschools.gov.in/Manrkeni-home/chapter;class=12;medium=19;termId=4;subjectId=3;subjectName=Mathematics"
-    );
+    await page.goto("https://manarkeni.tnschools.gov.in/subject/3", {
+        waitUntil: "domcontentloaded"
+    });
 
     console.log(`
 ===========================================
-Open any chapter.
-Open any section.
-Press ENTER when a NEW section starts.
-Open videos manually.
+Open a chapter.
+Open a topic/subtopic.
+Click videos manually.
 Everything is saved to ${OUTPUT}
+Press ENTER when a NEW section starts.
 Press Ctrl+C to stop.
 ===========================================
 `);
 
     let lastVideo = "";
 
-    // Store clicked card information
-    await page.exposeFunction("storeClicked", data => {
-        global.clicked = data;
+    /*
+     * Detect video button clicks in the new GUI.
+     */
+    await page.exposeFunction("storeClickedVideo", data => {
+        clickedVideo = data;
     });
 
     await page.addInitScript(() => {
 
         document.addEventListener("click", e => {
 
-            const card = e.target.closest(".video-box");
+            const button = e.target.closest("button");
 
-            if (!card)
+            if (!button)
                 return;
 
-            const subtopic =
-                card.querySelector("p")
-                    ?.innerText
-                    .replace("Subtopic :", "")
-                    .trim();
+            /*
+             * New video buttons contain:
+             *   img
+             *   p = video title
+             */
+            const videoText = button.querySelector("p");
 
-            const concept =
-                card.querySelector("p b")
-                    ?.innerText
-                    .replace("Concept :", "")
-                    .trim();
+            if (!videoText)
+                return;
 
-            window.storeClicked({
-                subtopic,
-                concept
+            const img = button.querySelector("img");
+
+            if (!img)
+                return;
+
+            const videoTitle = videoText.innerText.trim();
+
+            /*
+             * The video buttons are inside the
+             * accordion card.
+             *
+             * Get the accordion/topic title.
+             */
+            const card = button.closest("div.bg-card");
+
+            let topic = "";
+
+            if (card) {
+
+                const headingButton = [...card.querySelectorAll("button")]
+                    .find(btn => {
+                        const span = btn.querySelector("span");
+                        return span &&
+                               !btn.querySelector("img") &&
+                               span.innerText.trim();
+                    });
+
+                if (headingButton) {
+                    topic = headingButton
+                        .querySelector("span")
+                        ?.innerText
+                        .trim() || "";
+                }
+            }
+
+            window.storeClickedVideo({
+                title: videoTitle,
+                topic: topic
             });
 
         }, true);
@@ -84,13 +120,22 @@ Press Ctrl+C to stop.
 
         try {
 
-            if (!(await page.locator("video source").count())) {
+            /*
+             * NEW GUI:
+             *
+             * <video src="...mp4">
+             *
+             * Not:
+             * <video><source src="...">
+             */
+            const video = page.locator("video").first();
+
+            if (!(await video.count())) {
                 await page.waitForTimeout(300);
                 continue;
             }
 
-            const url =
-                await page.locator("video source").getAttribute("src");
+            const url = await video.getAttribute("src");
 
             if (!url || url === lastVideo) {
                 await page.waitForTimeout(300);
@@ -99,11 +144,44 @@ Press Ctrl+C to stop.
 
             lastVideo = url;
 
-            const title =
-                (await page.locator("app-video-list h4").textContent()).trim();
+            /*
+             * Get the title shown below the video.
+             */
+            let title = "";
 
+            try {
+                title = await video.evaluate(el => {
+
+                    const card = el.closest("div.bg-card");
+
+                    if (!card)
+                        return "";
+
+                    const span = card.querySelector(
+                        "span.text-sm.font-bold"
+                    );
+
+                    return span?.innerText.trim() || "";
+                });
+            } catch {
+                // ignore
+            }
+
+            /*
+             * Fallback to the title captured
+             * from the clicked video button.
+             */
+            if (!title) {
+                title = clickedVideo?.title || "Untitled Video";
+            }
+
+            /*
+             * Topic / accordion name.
+             */
             const desc =
-                global.clicked?.subtopic || title;
+                clickedVideo?.topic ||
+                clickedVideo?.title ||
+                title;
 
             if (printHeader) {
 
@@ -111,7 +189,7 @@ Press Ctrl+C to stop.
 
                 fs.appendFileSync(
                     OUTPUT,
-`\nreferences:
+                    `\nreferences:
     videos:
 `
                 );
@@ -119,23 +197,23 @@ Press Ctrl+C to stop.
 
             fs.appendFileSync(
                 OUTPUT,
-`      - custom:
-          title: "${title}"
-          desc: "${desc}"
+                `      - custom:
+          title: "${title.replace(/"/g, '\\"')}"
+          desc: "${desc.replace(/"/g, '\\"')}"
           url: "${url}"
 `
             );
 
-            console.log("Saved:", title);
+            console.log("\nSaved:");
+            console.log("  Title :", title);
+            console.log("  Desc  :", desc);
+            console.log("  URL   :", url);
 
-        } catch {
-
+        } catch (err) {
+            // Keep scraper alive if GUI changes temporarily.
         }
 
         await page.waitForTimeout(300);
-
     }
 
 })();
-
-
