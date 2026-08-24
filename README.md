@@ -1,8 +1,3 @@
-# Manarkeni Video Scraper
-
-A simple Playwright utility to collect Manarkeni video URLs and generate YAML references for TNEBooks.
-
----
 
 ## Requirements
 
