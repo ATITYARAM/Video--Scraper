@@ -197,10 +197,10 @@ Press Ctrl+C to stop.
 
             fs.appendFileSync(
                 OUTPUT,
-                `      - custom:
-          title: "${title.replace(/"/g, '\\"')}"
-          desc: "${desc.replace(/"/g, '\\"')}"
-          url: "${url}"
+                `        - custom:
+            title: "${title.replace(/"/g, '\\"')}"
+            desc: "${desc.replace(/"/g, '\\"')}"
+            url: "${url}"
 `
             );
 
